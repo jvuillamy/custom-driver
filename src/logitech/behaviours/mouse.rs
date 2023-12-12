@@ -1,4 +1,4 @@
-use super::{DriverBehaviour, DriverState, KeyDirection, PressType};
+use super::{DriverBehaviour, KeyDirection, PressType, SharedState};
 
 /**
  * This mode controls the mouse with the left/right buttons. A toggle long press
@@ -10,27 +10,27 @@ use super::{DriverBehaviour, DriverState, KeyDirection, PressType};
 pub struct MouseMode;
 
 impl DriverBehaviour for MouseMode {
-    fn handle_motion(&mut self, state: &mut DriverState, dir: KeyDirection) {
+    fn handle_motion(&mut self, state: &mut impl SharedState, dir: KeyDirection) {
         const MOVE_SPEED: i32 = 20;
         let sign: i32 = if dir == KeyDirection::LEFT { -1 } else { 1 };
 
-        let has_modifier = state.toggle_flag == PressType::LONG;
+        let has_modifier = state.get_toggle_flag() == PressType::LONG;
         let (x, y) = if has_modifier {
             (0, sign * MOVE_SPEED)
         } else {
             (sign * MOVE_SPEED, 0)
         };
 
-        state.controller.mouse_move(x, y);
+        state.get_controller().mouse_move(x, y);
     }
 
-    fn handle_toggle(&mut self, state: &mut DriverState) {
-        if state.toggle_flag == PressType::SHORT {
-            state.controller.mouse_right_click();
+    fn handle_toggle(&mut self, state: &mut impl SharedState) {
+        if state.get_toggle_flag() == PressType::SHORT {
+            state.get_controller().mouse_right_click();
         }
     }
 
-    fn handle_play(&mut self, state: &mut DriverState) {
-        state.controller.mouse_left_click();
+    fn handle_play(&mut self, state: &mut impl SharedState) {
+        state.get_controller().mouse_left_click();
     }
 }

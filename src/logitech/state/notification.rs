@@ -1,60 +1,38 @@
 use notify_rust::{Notification, NotificationHandle};
 
-use crate::logitech::DriverMode;
-
-fn icon_path(icon_name: &str) -> String {
-    std::fs::canonicalize(format!("./icons/{icon_name}.png"))
-        .unwrap_or_default()
-        .to_str()
-        .unwrap()
-        .into()
-}
-
-fn mode_as_icon(mode: &DriverMode) -> String {
-    match mode {
-        DriverMode::MouseMode(_) => icon_path("mouse"),
-        DriverMode::MorseMode(_) => icon_path("antenna"),
-        DriverMode::PlayerMode(_) => icon_path("movie"),
-    }
-}
-
 pub struct Monitor {
     handle: NotificationHandle,
-}
-
-impl Default for Monitor {
-    fn default() -> Self {
-        Self {
-            handle: Notification::new()
-                .summary("Starting driver...")
-                .icon(icon_path("welcome").as_str())
-                .show()
-                .unwrap(),
-        }
-    }
+    icon: String,
 }
 
 impl Monitor {
-    pub fn notify_mode_change(&mut self, mode: &DriverMode) {
-        self.handle
-            .summary(&format!("Mode changed: {}", mode.to_string()) as &str)
-            .icon(mode_as_icon(mode).as_str());
+    pub fn new(message: &str, icon: String) -> Self {
+        Monitor {
+            handle: Notification::new()
+                .summary(message)
+                .icon(&icon)
+                .show()
+                .unwrap(),
+            icon,
+        }
+    }
+
+    // Updates with a new message and icon.
+    pub fn notify_with_icon(&mut self, summary: &str, icon: String) {
+        self.icon = icon;
+        self.notify(summary);
+    }
+
+    /// Updates with a new message using the icon used before any calls
+    /// to [Self::notify_invalid].
+    pub fn notify(&mut self, summary: &str) {
+        self.handle.summary(summary).icon(&self.icon);
         self.handle.update();
     }
 
-    pub fn notify_morse_empty(&mut self) {
-        self.handle.summary("Current code: ");
-        self.handle.update();
-    }
-    
-    pub fn notify_morse_code(&mut self, code: &String) {
-        self.handle
-            .summary(&format!("Current code: {code}") as &str);
-        self.handle.update();
-    }
-
-    pub fn notify_morse_invalid(&mut self) {
-        self.handle.summary("Invalid morse code !").icon("error");
+    // Updates with a new message using an error icon.
+    pub fn notify_invalid(&mut self, summary: &str) {
+        self.handle.summary(summary).icon("error");
         self.handle.update();
     }
 }

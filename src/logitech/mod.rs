@@ -1,84 +1,27 @@
+/*!
+ *  # Logitech R400 Custom driver #
+ *  <center>
+ *      <img src="../../../../assets/R400.jpeg" height="200" />
+ *  </center>
+ *
+ *  This module mainly exposes:
+ *   - the [device::get] function to discover a Logitech USB Receiver device,   
+ *   - the [Driver] structure, allowing to control the Logitech R400 device.
+ *
+ *  The driver allows for three different modes of [behaviours] (grouped in the [DriverMode](behaviours::DriverMode) enum):
+ *   - [MouseMode](behaviours::DriverMode::MouseMode): controls the mouse using left/right (and up/down by holding the bottom-right button),
+ *   - [MorseMode](behaviours::DriverMode::MorseMode): translates the presses on the bottom-right button as morse code and inputs the corresponding characters,
+ *   - [PlayerMode](behaviours::DriverMode::PlayerMode): basic controls for media player (rewind/forward, play/pause...).
+ *
+ *   Switching between modes is done by holding both left and right buttons.
+ */
+
 pub mod device;
 pub mod keys;
 
 mod behaviours;
+mod driver;
 mod state;
+mod utils;
 
-use behaviours::{DriverBehaviour, DriverMode};
-use keys::{Key, KeyCode, KeyDirection, PressType};
-use state::DriverState;
-
-pub struct Driver {
-    state: DriverState,
-    mode: DriverMode,
-}
-
-impl Default for Driver {
-    fn default() -> Driver {
-        Driver {
-            state: Default::default(),
-            mode: DriverMode::MouseMode(Default::default()),
-        }
-    }
-}
-
-impl Driver {
-    pub fn process_event(&mut self, key: &Key) {
-        use KeyCode::*;
-        use PressType::*;
-
-        match (key.code, key.press) {
-            (Direction(_), RELEASE) => self.clear_mode_change(),
-            (Direction(d), SHORT | LONG) => {
-                if !self.is_mode_change(d) {
-                    // We don't want to trigger a SHORT press after
-                    // the motion handling considers it a LONG press.
-                    if self.state.toggle_flag == PressType::SHORT {
-                        self.state.toggle_flag = PressType::LONG;
-                    }
-
-                    self.mode.handle_motion(&mut self.state, d);
-                }
-            }
-
-            (TOGGLE, RELEASE) => {
-                self.mode.handle_toggle(&mut self.state);
-                self.state.toggle_flag = PressType::RELEASE;
-            }
-            (TOGGLE, t @ (SHORT | LONG)) => self.state.toggle_flag = t,
-
-            (PLAY, RELEASE) => (),
-            (PLAY, SHORT) => self.mode.handle_play(&mut self.state),
-            (PLAY, LONG) => unreachable!("Device does not have a LONG press on PLAY"),
-        }
-    }
-
-    fn clear_mode_change(&mut self) {
-        self.state.mode_change_flag = None;
-    }
-
-    fn is_mode_change(&mut self, dir: KeyDirection) -> bool {
-        let mode_has_changed = self.state.mode_change_flag.is_some_and(|state| {
-            if state != dir {
-                self.switch_mode();
-                true
-            } else {
-                false
-            }
-        });
-
-        self.state.mode_change_flag = Some(dir);
-        mode_has_changed
-    }
-
-    fn switch_mode(&mut self) {
-        use DriverMode::*;
-        self.mode = match self.mode {
-            MouseMode(_) => MorseMode(Default::default()),
-            MorseMode(_) => PlayerMode(Default::default()),
-            PlayerMode(_) => MouseMode(Default::default()),
-        };
-
-        self.state.notification.notify_mode_change(&self.mode)
-    }
-}
+pub use driver::Driver;

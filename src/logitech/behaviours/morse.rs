@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use once_cell::sync::Lazy;
 
-use super::{DriverBehaviour, DriverState, KeyDirection, PressType};
+use super::{DriverBehaviour, KeyDirection, PressType, SharedState};
 
 /**
  * This mode allows to input letters and numbers using morse code on the
@@ -72,39 +72,42 @@ impl MorseMode {
     fn get_character(&self) -> Option<char> {
         MorseMode::DICT.get(&self.morse as &str).copied()
     }
+
+    fn as_text(&self) -> String {
+        format!("Morse: {}", self.morse)
+    }
 }
 
 impl DriverBehaviour for MorseMode {
-    fn handle_motion(&mut self, state: &mut DriverState, dir: KeyDirection) {
-        use KeyDirection::*;
-
+    fn handle_motion(&mut self, state: &mut impl SharedState, dir: KeyDirection) {
+        use KeyDirection as KD;
         match (self.morse.is_empty(), dir) {
-            (true, LEFT) => state.controller.backspace_click(),
-            (true, RIGHT) => state.controller.spacebar_click(),
+            (true, KD::LEFT) => state.get_controller().backspace_click(),
+            (true, KD::RIGHT) => state.get_controller().spacebar_click(),
 
-            (false, LEFT) => {
+            (false, KD::LEFT) => {
                 self.morse.clear();
-                state.notification.notify_morse_empty();
+                state.get_notification().notify(&self.as_text());
             }
 
-            (false, RIGHT) => {
+            (false, KD::RIGHT) => {
                 if let Some(morse_translation) = self.get_character() {
-                    state.controller.add_character(morse_translation);
-                    state.notification.notify_morse_empty();
+                    state.get_controller().add_character(morse_translation);
+                    state.get_notification().notify(&self.as_text());
                 } else {
-                    state.notification.notify_morse_invalid();
+                    state.get_notification().notify_invalid(&self.as_text());
                 }
                 self.morse.clear();
             }
         }
     }
 
-    fn handle_toggle(&mut self, state: &mut DriverState) {
-        self.append(state.toggle_flag);
-        state.notification.notify_morse_code(&self.morse);
+    fn handle_toggle(&mut self, state: &mut impl SharedState) {
+        self.append(state.get_toggle_flag());
+        state.get_notification().notify(&self.as_text());
     }
 
-    fn handle_play(&mut self, state: &mut DriverState) {
-        state.controller.return_click();
+    fn handle_play(&mut self, state: &mut impl SharedState) {
+        state.get_controller().return_click();
     }
 }
